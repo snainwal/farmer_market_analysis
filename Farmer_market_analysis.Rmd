@@ -1,0 +1,322 @@
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(skimr)
+library(usmap)
+library(lubridate)
+library(gridExtra)
+library(wesanderson)
+library(ggthemes)
+library(treemap)
+```
+
+####----Code for joining the datasets----####
+
+
+colnames(zips)[c(1,6)]<-c("zip","State")
+zips$State<-str_trim(zips$State, side="left")
+m<-left_join(zips, state_region, by= c("State"))
+m<-na.omit(m)
+m<- select(m,"State","zip","city","Region")
+
+farmers_market_info_1<- farmers_market_info
+colnames(farmers_market_info_1)[21:22]<- c("longitude","latitude")
+farmers_market_info_1<-left_join(farmers_market_info_1,m, by=c("State","zip"))
+
+write.csv(farmers_market_info_1,"farmers_market_info_1.csv")
+
+#####----------------------------------#####
+
+
+
+
+###------- Answer-1:State wide distribution of farmer markets in the US --------####
+
+
+
+
+
+
+```{r}
+time_1<- select(farmers_market_info_1,"State","Region","Season1Date","Season1Time")
+time_1<-separate(time_1, Season1Date, c("Start_date","End_date") ,sep="to", remove = TRUE)
+time_1<-separate(time_1, Season1Time, c("Day","Time"), sep=";")
+time_1<- time_1[-6]
+time_1$Day<-gsub(" ","",time_1$Day)
+time_1$Day<- str_sub(time_1$Day,5L)
+time_1<-separate(time_1, Day, c("Start_time","End_time") ,sep="-", remove = TRUE)
+time_1$Start_time<-as.POSIXct(time_1$Start_time,tz="",format="%I:%M%p")
+time_1$End_time<-as.POSIXct(time_1$End_time,tz="",format="%I:%M%p")
+time_1$Duration_hrs<-difftime(time_1$End_time,time_1$Start_time, units = "hours")
+time_1$Start_time<-format(time_1$Start_time,"%I%M")
+time_1$End_time<-format(time_1$End_time,"%I%M")
+time_1$Start_date<-as.Date(time_1$Start_date,"%m/%d/%Y")
+time_1$End_date<-as.Date(time_1$End_date,"%m/%d/%Y")
+time_1$Season_Year<-format(time_1$Start_date,"%Y")
+time_1$Total_season_days<- time_1$End_date-time_1$Start_date
+time_1$Start_month<-format(time_1$Start_date,"%B")
+
+
+time_1$End_month<-format(time_1$End_date,"%B")
+time_1<- data.frame(Markets=farmers_market_info_1$Marketme,time_1)
+time_1$Season_Year<-as.integer(time_1$Season_Year)
+time_1<- filter(time_1,Region %in% c("West","Northeast","South","Midwest"))
+
+```
+
+```{r}
+q_1<- filter(time_1, Season_Year %in% c(2013,2014,2015,2016,2017,2018))
+q_1<- select(q_1, "State","Region")
+
+a_1<- q_1
+a_1<- filter(a_1, Region %in% c("West","Northeast","South","Midwest"))
+a_1<- summarize(group_by(a_1,State, Region), total_farmer_markets = n())
+colnames(a_1)[1:2]<-c("state","region")
+a_1<-ungroup(a_1)
+a_1<- arrange(a_1,desc(total_farmer_markets))
+
+a_2<- summarise(group_by(q_1,Region),total_count=n())
+a_2<- filter(a_2,Region %in% c("West","Northeast","South","Midwest"))
+```
+
+```{r}
+pol_1<- plot_usmap(data=a_1,values ="total_farmer_markets",color="black",labels = T,label_color = "black",size=1)+labs(title = "State-wise Number of Farmer Markets in United States (2013-2018)")+scale_fill_continuous(low="antiquewhite",high="purple3",label=scales::comma)+theme(legend.position = c(0.35,.89),legend.title = element_blank(),legend.direction = "horizontal",legend.key.height = unit(.75,"line"),legend.key.width = unit(1.5,"line"))
+pol_2<-pol_1+theme(plot.title = element_text(face="bold",hjust = 0.5,size=14),panel.border = element_rect(colour = "black", fill=NA, size=1))
+pol_2
+```
+
+```{r}
+### mean & median ###
+which.min(a_1$total_farmer_markets)
+state_min<-a_1[51,]
+
+which.max(a_1$total_farmer_markets)
+state_max<-a_1[1,]
+
+state_min
+state_max
+summary(a_1)
+```
+
+
+```{r}
+pol_3<- ggplot(a_1, aes(x=reorder(region,total_farmer_markets),y=total_farmer_markets,fill=region))+geom_boxplot(width=0.5,outlier.shape = 18, outlier.color = "honeydew1",outlier.size = 6, fill = wes_palette(n=4, name="Chevalier1"))+coord_flip()+stat_summary(fun.y= "mean",fun.ymax = "max",fun.ymin = "min", size=0.5,color="red3")+theme(axis.title.x = element_blank(),axis.title.y = element_blank())+labs(title = "Distribution of Farmer Markets: Region-wise")+theme(plot.title = element_text(face="bold",hjust = 0.5,size=15),panel.border = element_rect(colour = "black", fill=NA, size=1.5))+theme(panel.grid = element_blank(),panel.background = element_rect(fill = "grey60"))+theme(legend.position = "none",axis.text.y = element_text(face="bold",size = 12))
+```
+
+```{r}
+pol_4<- ggplot(a_2,aes(x= reorder(Region,total_count),y= total_count,fill=Region))+geom_bar(stat="identity", fill="mistyrose1",width=0.7)+coord_flip()+theme(axis.title.x=element_blank(),axis.title.y = element_blank())+labs(title = "Total Farmer Markets:Region-wise ")+theme(plot.title = element_text(face="bold",hjust = 0.5,size=15),panel.border = element_rect(colour = "black", fill=NA, size=1.5))+theme(panel.grid = element_blank(),panel.background = element_rect(fill="grey27"))+theme(legend.position = "none",axis.text.y = element_text(face="bold",size = 12))
+
+pol_4
+grid.arrange(pol_3,pol_4)
+```
+
+
+
+###---Answer 2: Average operational farmer markets days in the US----####
+
+
+
+
+```{r}
+b_1<- select(time_1, "Markets","State","Region","Season_Year","Total_season_days","Duration_hrs","Start_month","End_month")
+b_1<-na.omit(b_1)
+b_1<- filter(b_1,Season_Year %in% c(2012,2013,2014,2015,2016,2017,2018))
+row_remove<-which(b_1$Total_season_days<=0)
+b_1<-b_1[-row_remove,]
+```
+
+
+```{r}
+#Number of season days in each region w.r.t year
+
+b_2<-select(b_1,Markets, Region,Season_Year, Total_season_days)
+b_2<-summarise(group_by(b_2, Region, Season_Year),total=round(mean(Total_season_days)))
+b_2<- filter(b_2,Season_Year %in% c(2013,2014,2015,2016,2017,2018))
+b_2$total<- as.numeric(b_2$total)
+
+z_2<-ggplot(b_2, aes(x=Season_Year,y= total, color=Region))+geom_line(size=2)+geom_point(size=3,color="darkgreen")+labs(x="Year",y="Average Operating Days",title = "Average Days of Operation of Farmer Markets each year:Region-wise")+scale_x_continuous(breaks = c(2013,2014,2015,2016,2017,2018))+theme(legend.position = c(.9,.35),legend.title = element_blank(),legend.direction = "vertical",legend.key.height = unit(.75,"line"),legend.key.width = unit(1.5,"line"))+theme(panel.grid.minor= element_blank(),panel.grid.major.x = element_blank(),panel.background = element_rect(fill="grey90"),plot.title = element_text(face="bold",hjust = 0.5,size=15),panel.border = element_rect(colour = "black", fill=NA, size=1.5),axis.text = element_text(face="bold",size = 8),axis.title = element_text(face="bold",size = 12))+scale_color_manual(values=wes_palette(n=4,name="GrandBudapest1"))
+z_2
+```
+
+
+
+```{r}
+#Number of markets in each region w.r.t season
+
+b_3<- select(b_1,Markets,Region,Season_Year,Start_month)
+
+dc<- data.frame(Start_month<-c("March","April","May","June","July","August","September","October","November","December","January","February"), Season<-c("Spring","Spring","Spring","Summer","Summer","Summer","Fall","Fall","Fall","Winter","Winter","Winter"))
+
+colnames(dc)<-c("Start_month","Season")
+dc$Start_month<- as.character(dc$Start_month)
+
+b_3<- left_join(dc,b_3, by="Start_month")
+b_4<- summarise(group_by(b_3,Season,Region,Season_Year), Total_number_markets= n())
+
+z_1<-ggplot(b_4, aes(x=reorder(Season,Total_number_markets),y= Total_number_markets,fill=Season))+coord_flip()+geom_bar(stat="identity", position = "dodge")+labs(x="Seasons",y="Number of farmer markets",title="Number of Farmer Markets by Season:Region-wise")+facet_wrap(~Region, scales = "fixed")+theme(legend.position = "top",legend.box = "horizontal")+theme(plot.title = element_text(face="bold",hjust = 0.5,size=15),strip.background = element_rect(colour="black", fill=c("honeydew4"),size=1.5, linetype="solid"), strip.text = element_text(face="italic",size = 12,colour = "honeydew1"),panel.border = element_rect(colour = "black", fill=NA, size=1.5),panel.background = element_rect(fill="grey90"),panel.grid.minor.x =element_blank() ,panel.grid.major.y = element_blank(),legend.key.height = unit(.75,"line"),legend.key.width = unit(1,"line"),axis.title = element_text(face="bold",size = 12),axis.text =element_text(face="bold",size = 10))+scale_fill_manual(values=wes_palette(n=4,name="GrandBudapest1"))
+z_1
+
+```
+
+
+
+
+
+
+#####----Answer 3: Popular products in each season-----#####
+
+
+
+
+
+
+
+```{r}
+prod_1<-select(farmers_market_info_1,"State","Region")
+
+prod_2<-select(farmers_market_info_1,29:58)
+prod_2<-lapply(prod_2, str_replace_all,"Y","1")
+prod_2<-lapply(prod_2,str_replace_all,"-","0")
+prod_2<-lapply(prod_2,str_replace_all,"N","0")
+prod_2<-lapply(prod_2,str_replace_na,"0")
+prod_2<-lapply(prod_2, as.numeric)
+
+prod_semi<-data.frame(prod_2)
+prod_semi<-na.omit(prod_semi)
+
+veg<- transmute(prod_semi,Plant_based_products=Beans+Grains+Herbs+Vegetables+Mushrooms)
+nur<- transmute(prod_semi, Nursery_products=Flowers+Plants+Trees+Nursery)
+mi<- transmute(prod_semi, Milk_Polutry_products=Cheese+Eggs+Tofu+Poultry)
+br<- transmute(prod_semi,Breakfast= Bakedgoods+Coffee+Honey+Jams+Juices+Maple+Nuts)
+
+veg<-ifelse(veg$Plant_based_products>=1,1,0)
+nur<-ifelse(nur$Nursery_products>=1,1,0)
+mi<-ifelse(mi$Milk_Polutry_products>=1,1,0)
+br<-ifelse(br$Breakfast>=1,1,0)
+
+prod_1$Plant_based_products<-veg
+prod_1$Nursery_products<-nur
+prod_1$Milk_Polutary_product<-mi
+prod_1$Breakfast<-br
+prod_1$Meat<-prod_semi$Meat
+prod_1$Seafood<-prod_semi$Seafood
+prod_1$Organic_products<-prod_semi$Organic
+prod_1$Prepared_products<-prod_semi$Prepared
+prod_1$Wild_Harvest_product<-prod_semi$WildHarvested
+prod_1$Wine<-prod_semi$Wine
+
+prod_final<- prod_1
+prod_final_1<-prod_final
+
+prod_final_1<- na.omit(prod_final_1)
+prod_final_1$Year<-time_1$Season_Year
+prod_final_1$Start_month<-time_1$Start_month
+
+prod_final_1<- left_join(dc,prod_final_1,by="Start_month")
+prod_final_1$Season<- as.factor(prod_final_1$Season)
+prod_final_1<- filter(prod_final_1, Year%in% c(2013,2014,2015,2016,2017,2018))
+prod_final_1<- prod_final_1[,-1]
+products<- c(colnames(prod_final_1[4:13]))
+
+```
+
+
+
+```{r}
+prod_final_2<- select(prod_final_1,"Region","Year","Season",products)
+products<- c(colnames(prod_final_2[4:12]))
+prod_final_2<-gather(prod_final_2,Product_type,Total,products)  
+prod_final_2<-summarise(group_by(prod_final_2,Region,Year,Season,Product_type), Total=sum(Total))
+prod_final_2<-ungroup(prod_final_2)
+```
+
+```{r}
+
+prod_final_2$Product_type<- str_replace_all(prod_final_2$Product_type,"_"," ")
+ex<- select(prod_final_2,"Region","Product_type","Season","Total")
+ex<-summarise(group_by(ex,Region,Product_type,Season), Total=sum(Total))
+treemap(ex,index = c("Season","Product_type"),vSize = c("Total"),vColor = c("Product_type"),type="categorical",algorithm = "pivotSize",sortID="-size",range=c(-20,200),palette=c("#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850","#9e2800","#FFA69E","#d2d8d3"),position.legend = "none",align.labels=list(c("center", "center"), c("left", "top")),lowerbound.cex.labels=.5,title = "Season-wise Products Availability in the United States",fontsize.title = 16,border.col = "white",bg.labels = "grey100",aspRatio = 1.77,fontsize.labels=c(14, 10),fontface.labels = "italic") 
+```
+
+
+
+
+```{r}
+
+##--top five products
+top_five<- summarise(group_by(prod_final_2,Product_type),Grand_total=sum(Total))
+top_five<-arrange(top_five,desc(Grand_total))
+top_five_names<-c(head(top_five$Product_type,n=5))
+
+prod_final_3<-filter(prod_final_2,Product_type %in% top_five_names)
+
+ggplot(prod_final_3, aes(x=reorder(Season,Total), y= Total,fill=Product_type)) + geom_bar(stat="identity")+coord_flip()+facet_wrap(~Region)
+```
+
+
+
+
+
+
+
+#####------Answer 4: Popular Payment methods in each region-----######
+
+
+
+
+
+
+```{r}
+prod_1<-select(farmers_market_info_1,"Region","Marketme")
+
+pay_2<-select(farmers_market_info_1,24:29)
+pay_2<-lapply(pay_2, str_replace_all,"Y","1")
+pay_2<-lapply(pay_2,str_replace_all,"-","0")
+pay_2<-lapply(pay_2,str_replace_all,"N","0")
+pay_2<-lapply(pay_2,str_replace_na,"0")
+pay_2<-lapply(pay_2, as.numeric)
+
+pay_semi<-data.frame(prod_1,pay_2)
+pay_semi<-na.omit(pay_semi)
+```
+
+```{r}
+pay_final<- summarise_each(group_by(pay_semi,Region),funs(sum),Credit:SNAP)
+pay_final_1<-gather(pay_final,Payment_types,Total_payments, Credit:SNAP)
+
+```
+
+```{r}
+pay_northeast<- filter(pay_final_1, Region=="Northeast")
+total<- sum(pay_northeast$Total_payments)
+pay_northeast$Percent_share<- pay_northeast$Total_payments/total 
+
+pay_west<- filter(pay_final_1, Region=="West")
+total<- sum(pay_west$Total_payments)
+pay_west$Percent_share<- pay_west$Total_payments/total
+
+
+pay_south<- filter(pay_final_1, Region=="South")
+total<- sum(pay_south$Total_payments)
+pay_south$Percent_share<- pay_south$Total_payments/total
+
+
+pay_midwest<- filter(pay_final_1, Region=="Midwest")
+total<- sum(pay_midwest$Total_payments)
+pay_midwest$Percent_share<- pay_midwest$Total_payments/total
+
+
+pay_region<- rbind(pay_northeast,pay_midwest,pay_south,pay_west)
+pay_region$Percent_share<-str_sub(pay_region$Percent_share,1L,4L)
+pay_region$Percent_share<- as.numeric(pay_region$Percent_share)
+#pay_region$Payment_types<- as.factor(pay_region$Payment_types)
+
+v_1<-ggplot(pay_region, aes(x = 50, y = Percent_share,color=Payment_types,size=Percent_share,label=scales::percent(Percent_share))) + geom_point(stat="identity", alpha = 0.5)+scale_size(range = c(2, 10), name="Market Share")+facet_grid(factor(Payment_types,levels=c("Credit","SNAP","SFMNP","WIC","WICcash"))~Region,scales = "fixed",switch = "y")+guides(size = guide_legend(reverse=T))+ylim(0,.58)+theme(axis.title = element_blank(),axis.ticks = element_blank(),axis.line = element_blank(),panel.border = element_blank(),panel.grid=element_blank(),axis.text.x = element_blank(),axis.text.y=element_blank(),strip.background = element_rect(colour="black", fill=c("honeydew4"),size=1.5, linetype="solid"), strip.text = element_text(face="italic",size = 12,colour = "honeydew1"),panel.background = element_rect(fill="grey95"),legend.position = "none")+geom_text(size=4,color="black",hjust=-.35)+scale_color_manual(values=wes_palette(n=5,name="Darjeeling1"))+theme(plot.title = element_text(face="bold",hjust = 0.5,size=14))+labs(title = "Share of Payment Methods at Farmer Markets:Region-wise")
+
+v_1
+```
+
