@@ -1,5 +1,3 @@
-
-
 ```{r}
 library(dplyr)
 library(tidyr)
@@ -16,7 +14,6 @@ library(treemap)
 
 ####----Code for joining the datasets----####
 
-
 colnames(zips)[c(1,6)]<-c("zip","State")
 zips$State<-str_trim(zips$State, side="left")
 m<-left_join(zips, state_region, by= c("State"))
@@ -26,20 +23,11 @@ m<- select(m,"State","zip","city","Region")
 farmers_market_info_1<- farmers_market_info
 colnames(farmers_market_info_1)[21:22]<- c("longitude","latitude")
 farmers_market_info_1<-left_join(farmers_market_info_1,m, by=c("State","zip"))
-
 write.csv(farmers_market_info_1,"farmers_market_info_1.csv")
 
 #####----------------------------------#####
 
-
-
-
 ###------- Answer-1:State wide distribution of farmer markets in the US --------####
-
-
-
-
-
 
 ```{r}
 time_1<- select(farmers_market_info_1,"State","Region","Season1Date","Season1Time")
@@ -60,12 +48,10 @@ time_1$Season_Year<-format(time_1$Start_date,"%Y")
 time_1$Total_season_days<- time_1$End_date-time_1$Start_date
 time_1$Start_month<-format(time_1$Start_date,"%B")
 
-
 time_1$End_month<-format(time_1$End_date,"%B")
 time_1<- data.frame(Markets=farmers_market_info_1$Marketme,time_1)
 time_1$Season_Year<-as.integer(time_1$Season_Year)
 time_1<- filter(time_1,Region %in% c("West","Northeast","South","Midwest"))
-
 ```
 
 ```{r}
@@ -102,7 +88,6 @@ state_max
 summary(a_1)
 ```
 
-
 ```{r}
 pol_3<- ggplot(a_1, aes(x=reorder(region,total_farmer_markets),y=total_farmer_markets,fill=region))+geom_boxplot(width=0.5,outlier.shape = 18, outlier.color = "honeydew1",outlier.size = 6, fill = wes_palette(n=4, name="Chevalier1"))+coord_flip()+stat_summary(fun.y= "mean",fun.ymax = "max",fun.ymin = "min", size=0.5,color="red3")+theme(axis.title.x = element_blank(),axis.title.y = element_blank())+labs(title = "Distribution of Farmer Markets: Region-wise")+theme(plot.title = element_text(face="bold",hjust = 0.5,size=15),panel.border = element_rect(colour = "black", fill=NA, size=1.5))+theme(panel.grid = element_blank(),panel.background = element_rect(fill = "grey60"))+theme(legend.position = "none",axis.text.y = element_text(face="bold",size = 12))
 ```
@@ -114,12 +99,7 @@ pol_4
 grid.arrange(pol_3,pol_4)
 ```
 
-
-
 ###---Answer 2: Average operational farmer markets days in the US----####
-
-
-
 
 ```{r}
 b_1<- select(time_1, "Markets","State","Region","Season_Year","Total_season_days","Duration_hrs","Start_month","End_month")
@@ -128,7 +108,6 @@ b_1<- filter(b_1,Season_Year %in% c(2012,2013,2014,2015,2016,2017,2018))
 row_remove<-which(b_1$Total_season_days<=0)
 b_1<-b_1[-row_remove,]
 ```
-
 
 ```{r}
 #Number of season days in each region w.r.t year
@@ -141,8 +120,6 @@ b_2$total<- as.numeric(b_2$total)
 z_2<-ggplot(b_2, aes(x=Season_Year,y= total, color=Region))+geom_line(size=2)+geom_point(size=3,color="darkgreen")+labs(x="Year",y="Average Operating Days",title = "Average Days of Operation of Farmer Markets each year:Region-wise")+scale_x_continuous(breaks = c(2013,2014,2015,2016,2017,2018))+theme(legend.position = c(.9,.35),legend.title = element_blank(),legend.direction = "vertical",legend.key.height = unit(.75,"line"),legend.key.width = unit(1.5,"line"))+theme(panel.grid.minor= element_blank(),panel.grid.major.x = element_blank(),panel.background = element_rect(fill="grey90"),plot.title = element_text(face="bold",hjust = 0.5,size=15),panel.border = element_rect(colour = "black", fill=NA, size=1.5),axis.text = element_text(face="bold",size = 8),axis.title = element_text(face="bold",size = 12))+scale_color_manual(values=wes_palette(n=4,name="GrandBudapest1"))
 z_2
 ```
-
-
 
 ```{r}
 #Number of markets in each region w.r.t season
@@ -162,18 +139,7 @@ z_1
 
 ```
 
-
-
-
-
-
 #####----Answer 3: Popular products in each season-----#####
-
-
-
-
-
-
 
 ```{r}
 prod_1<-select(farmers_market_info_1,"State","Region")
@@ -221,10 +187,7 @@ prod_final_1$Season<- as.factor(prod_final_1$Season)
 prod_final_1<- filter(prod_final_1, Year%in% c(2013,2014,2015,2016,2017,2018))
 prod_final_1<- prod_final_1[,-1]
 products<- c(colnames(prod_final_1[4:13]))
-
 ```
-
-
 
 ```{r}
 prod_final_2<- select(prod_final_1,"Region","Year","Season",products)
@@ -235,40 +198,23 @@ prod_final_2<-ungroup(prod_final_2)
 ```
 
 ```{r}
-
 prod_final_2$Product_type<- str_replace_all(prod_final_2$Product_type,"_"," ")
 ex<- select(prod_final_2,"Region","Product_type","Season","Total")
 ex<-summarise(group_by(ex,Region,Product_type,Season), Total=sum(Total))
 treemap(ex,index = c("Season","Product_type"),vSize = c("Total"),vColor = c("Product_type"),type="categorical",algorithm = "pivotSize",sortID="-size",range=c(-20,200),palette=c("#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850","#9e2800","#FFA69E","#d2d8d3"),position.legend = "none",align.labels=list(c("center", "center"), c("left", "top")),lowerbound.cex.labels=.5,title = "Season-wise Products Availability in the United States",fontsize.title = 16,border.col = "white",bg.labels = "grey100",aspRatio = 1.77,fontsize.labels=c(14, 10),fontface.labels = "italic") 
 ```
 
-
-
-
 ```{r}
-
 ##--top five products
 top_five<- summarise(group_by(prod_final_2,Product_type),Grand_total=sum(Total))
 top_five<-arrange(top_five,desc(Grand_total))
 top_five_names<-c(head(top_five$Product_type,n=5))
-
 prod_final_3<-filter(prod_final_2,Product_type %in% top_five_names)
 
 ggplot(prod_final_3, aes(x=reorder(Season,Total), y= Total,fill=Product_type)) + geom_bar(stat="identity")+coord_flip()+facet_wrap(~Region)
 ```
 
-
-
-
-
-
-
 #####------Answer 4: Popular Payment methods in each region-----######
-
-
-
-
-
 
 ```{r}
 prod_1<-select(farmers_market_info_1,"Region","Marketme")
@@ -287,29 +233,21 @@ pay_semi<-na.omit(pay_semi)
 ```{r}
 pay_final<- summarise_each(group_by(pay_semi,Region),funs(sum),Credit:SNAP)
 pay_final_1<-gather(pay_final,Payment_types,Total_payments, Credit:SNAP)
-
 ```
 
 ```{r}
 pay_northeast<- filter(pay_final_1, Region=="Northeast")
 total<- sum(pay_northeast$Total_payments)
 pay_northeast$Percent_share<- pay_northeast$Total_payments/total 
-
 pay_west<- filter(pay_final_1, Region=="West")
 total<- sum(pay_west$Total_payments)
 pay_west$Percent_share<- pay_west$Total_payments/total
-
-
 pay_south<- filter(pay_final_1, Region=="South")
 total<- sum(pay_south$Total_payments)
 pay_south$Percent_share<- pay_south$Total_payments/total
-
-
 pay_midwest<- filter(pay_final_1, Region=="Midwest")
 total<- sum(pay_midwest$Total_payments)
 pay_midwest$Percent_share<- pay_midwest$Total_payments/total
-
-
 pay_region<- rbind(pay_northeast,pay_midwest,pay_south,pay_west)
 pay_region$Percent_share<-str_sub(pay_region$Percent_share,1L,4L)
 pay_region$Percent_share<- as.numeric(pay_region$Percent_share)
